@@ -16,9 +16,6 @@ class DOMGameEngine {
          this.lives = 3; // Initialize with 3 lives
          this.currentLevel = 1;
          this.isRespawning = false; // Flag to prevent multiple deaths during respawn
-         this.gameStarted = false; // Flag to track if game has started
-         this.soundEnabled = false; // Default to disabled to prevent 404 errors
-         this.isChangingLevel = false; // Flag to prevent multiple level changes
          
          // Configurer le conteneur
          this.container.style.width = `${width}px`;
@@ -211,22 +208,12 @@ class DOMGameEngine {
          // Animate coin collection
          coin.domElement.style.animation = 'collect-coin 0.3s ease-out';
          
-         // Play sound immediately to improve response time
-         this.playSound('coin');
-         
-         // Update score immediately
-         this.score += 10;
-         this.updateScore();
-         
          setTimeout(() => {
-             // Remove elements if they still exist
-             if (this.elements.includes(coin)) {
-                 this.removeElement(coin);
-             }
-             
-             if (this.elements.includes(sparkle)) {
-                 this.removeElement(sparkle);
-             }
+             this.removeElement(coin);
+             this.removeElement(sparkle);
+             this.score += 10;
+             this.updateScore();
+             this.playSound('coin');
          }, 300);
      }
      
@@ -324,6 +311,7 @@ class DOMGameEngine {
          this.playSound('die');
          
          // Pause the game briefly
+         const wasRunning = this.isGameRunning;
          this.stop();
          
          // Make sure the player is marked as "dead" to prevent any interactions
@@ -358,17 +346,16 @@ class DOMGameEngine {
          }, 1000);
      }
      
-     cleanupDeadPlayer() {
-         // Force remove the player from the elements array
-         this.elements = this.elements.filter(el => el !== this.player && el.type !== 'player');
-         
-         // Clear player reference
-         this.player = null;
-     }
-     
      respawnPlayer() {
-         // Double-check that no player elements exist
-         this.elements = this.elements.filter(el => el.type !== 'player');
+         // Remove the current player
+         if (this.player) {
+             this.removeElement(this.player);
+             this.player = null;
+         }
+         
+         // Reset enemies positions
+         // Optional: Restore all enemies to their starting positions
+         // Or just keep them as is for more difficulty
          
          // Create a new player at the spawn point
          const currentLevel = this.levels[this.currentLevel - 1];
@@ -896,51 +883,20 @@ class DOMGameEngine {
      }
      
      playSound(soundType) {
-         // Check if sounds are enabled - can be toggled in options
-         if (!this.soundEnabled) return;
-         
-         // More reliable sound URLs using short sounds
-         const soundURLs = {
-             'coin': 'https://assets.mixkit.co/sfx/preview/mixkit-coin-flip-1971.mp3',
-             'jump': 'https://assets.mixkit.co/sfx/preview/mixkit-player-jumping-in-a-video-game-2043.mp3',
-             'powerup': 'https://assets.mixkit.co/sfx/preview/mixkit-game-level-completed-2059.mp3',
-             'stomp': 'https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3',
-             'fireball': 'https://assets.mixkit.co/sfx/preview/mixkit-short-laser-gun-shot-1670.mp3',
-             'block-hit': 'https://assets.mixkit.co/sfx/preview/mixkit-video-game-retro-click-237.mp3',
-             'die': 'https://assets.mixkit.co/sfx/preview/mixkit-player-losing-or-failing-2042.mp3',
-             'power-down': 'https://assets.mixkit.co/sfx/preview/mixkit-game-show-buzz-in-3090.mp3'
+         // Implémentation simple de sons
+         const sounds = {
+             'coin': new Audio('sounds/coin.mp3'),
+             'jump': new Audio('sounds/jump.mp3'),
+             'powerup': new Audio('sounds/powerup.mp3'),
+             'stomp': new Audio('sounds/stomp.mp3'),
+             'fireball': new Audio('sounds/fireball.mp3'),
+             'block-hit': new Audio('sounds/block-hit.mp3'),
+             'die': new Audio('sounds/die.mp3'),
+             'power-down': new Audio('sounds/power-down.mp3')
          };
          
-         // Safe check for the sound type
-         if (!soundType || !soundURLs[soundType]) return;
-         
-         try {
-             // Create a new Audio object each time to allow overlapping sounds
-             const sound = new Audio(soundURLs[soundType]);
-             
-             // Set volume lower because these sounds might be louder
-             sound.volume = 0.3;
-             
-             // Use a simple state check to avoid autoplay issues
-             // This pattern helps with browsers that block autoplay
-             let playAttempt = setInterval(() => {
-                 sound.play()
-                     .then(() => {
-                         clearInterval(playAttempt);
-                     })
-                     .catch(e => {
-                         console.log("Auto-play blocked, waiting for user interaction", e);
-                         // We'll try again in the interval
-                     });
-             }, 300);
-             
-             // Clear the interval after 2 seconds if it hasn't played yet
-             setTimeout(() => {
-                 clearInterval(playAttempt);
-             }, 2000);
-             
-         } catch (e) {
-             console.error('Error creating audio:', e);
+         if (sounds[soundType]) {
+             sounds[soundType].play().catch(e => console.log('Sound play error:', e));
          }
      }
      
@@ -1016,6 +972,16 @@ class DOMGameEngine {
          this.currentLevel = 1;
          this.lives = 3;
          this.isRespawning = false;
+         
+         // Remove UI elements to prevent duplicates
+         if (this.scoreDisplay) {
+             document.body.removeChild(this.scoreDisplay);
+             this.scoreDisplay = null;
+         }
+         if (this.livesDisplay) {
+             document.body.removeChild(this.livesDisplay);
+             this.livesDisplay = null;
+         }
          
          // Safe removal of UI elements
          this.cleanupUI();
